@@ -1,0 +1,8 @@
+/.codex/
+/helloagents/
+/.cache/
+/config.yaml
+/configs/config.yaml
+/prometheus-dingtalk-hook
+/bin/
+/dist/
