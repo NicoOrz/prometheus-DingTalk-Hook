@@ -1,0 +1,233 @@
+// 包 runtime 将配置编译为可用于请求处理的运行时状态。
+package runtime
+
+import (
+	"fmt"
+	"log/slog"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	"prometheus-dingtalk-hook/internal/alertmanager"
+	"prometheus-dingtalk-hook/internal/config"
+	"prometheus-dingtalk-hook/internal/dingtalk"
+	"prometheus-dingtalk-hook/internal/router"
+	"prometheus-dingtalk-hook/internal/template"
+)
+
+type Mode string
+
+const (
+	ModeChannels Mode = "channels"
+	ModeLegacy   Mode = "legacy"
+)
+
+type Channel struct {
+	Name         string
+	Robots       []config.RobotConfig
+	Template     string
+	Mention      config.MentionConfig
+	MentionRules []router.MentionRule
+}
+
+func (c Channel) EffectiveMention(msg alertmanager.WebhookMessage) config.MentionConfig {
+	out := c.Mention
+	for _, rule := range c.MentionRules {
+		if rule.When.Match(msg) {
+			out = router.MergeMention(out, rule.Mention)
+		}
+	}
+	return normalizeMention(out)
+}
+
+type Runtime struct {
+	Mode       Mode
+	ConfigPath string
+	BaseDir    string
+
+	Config   *config.Config
+	Renderer *template.Renderer
+	DingTalk *dingtalk.Client
+
+	Robots   map[string]config.RobotConfig
+	Channels map[string]Channel
+	Routes   []router.Route
+
+	LoadedAt time.Time
+}
+
+func LoadFromFile(logger *slog.Logger, configPath string) (*Runtime, error) {
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return nil, err
+	}
+
+	baseDir := filepath.Dir(configPath)
+	rt, err := Build(logger, configPath, baseDir, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return rt, nil
+}
+
+func Build(logger *slog.Logger, configPath, baseDir string, cfg *config.Config) (*Runtime, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	renderer, err := template.NewRenderer(cfg.Template)
+	if err != nil {
+		return nil, err
+	}
+
+	dt := dingtalk.NewClient(cfg.DingTalk.Timeout.Duration())
+	robots := cfg.DingTalk.RobotsByName()
+
+	mode := ModeChannels
+	channelsCfg := cfg.DingTalk.Channels
+	routesCfg := cfg.DingTalk.Routes
+	if len(channelsCfg) == 0 {
+		mode = ModeLegacy
+		channelsCfg, routesCfg = legacyToChannels(cfg)
+		logger.Info("使用 legacy dingtalk.receivers 配置（建议迁移到 dingtalk.channels/routes）")
+	}
+
+	channels, err := compileChannels(cfg, robots, channelsCfg)
+	if err != nil {
+		return nil, err
+	}
+	for name, ch := range channels {
+		tplName := strings.TrimSpace(ch.Template)
+		if tplName == "" {
+			tplName = renderer.DefaultName()
+		}
+		if !renderer.HasTemplate(tplName) {
+			return nil, fmt.Errorf("channel %q references unknown template %q", name, tplName)
+		}
+	}
+
+	routes := router.CompileRoutes(routesCfg)
+
+	if _, ok := channels["default"]; !ok {
+		return nil, fmt.Errorf("default channel is required")
+	}
+
+	return &Runtime{
+		Mode:       mode,
+		ConfigPath: configPath,
+		BaseDir:    baseDir,
+		Config:     cfg,
+		Renderer:   renderer,
+		DingTalk:   dt,
+		Robots:     robots,
+		Channels:   channels,
+		Routes:     routes,
+		LoadedAt:   time.Now(),
+	}, nil
+}
+
+func legacyToChannels(cfg *config.Config) ([]config.ChannelConfig, []config.RouteConfig) {
+	channels := make([]config.ChannelConfig, 0, len(cfg.DingTalk.Receivers))
+	routes := make([]config.RouteConfig, 0, len(cfg.DingTalk.Receivers))
+
+	receivers := make([]string, 0, len(cfg.DingTalk.Receivers))
+	for receiver := range cfg.DingTalk.Receivers {
+		receivers = append(receivers, receiver)
+	}
+	sort.Strings(receivers)
+
+	for _, receiver := range receivers {
+		robotNames := cfg.DingTalk.Receivers[receiver]
+		channels = append(channels, config.ChannelConfig{
+			Name:     receiver,
+			Robots:   append([]string(nil), robotNames...),
+			Template: cfg.Template.Default,
+		})
+		if receiver != "default" {
+			routes = append(routes, config.RouteConfig{
+				Name:     "legacy-receiver-" + receiver,
+				When:     config.WhenConfig{Receiver: []string{receiver}},
+				Channels: []string{receiver},
+			})
+		}
+	}
+	return channels, routes
+}
+
+func compileChannels(cfg *config.Config, robots map[string]config.RobotConfig, channelsCfg []config.ChannelConfig) (map[string]Channel, error) {
+	out := make(map[string]Channel, len(channelsCfg))
+	for _, ch := range channelsCfg {
+		name := strings.TrimSpace(ch.Name)
+		if name == "" {
+			return nil, fmt.Errorf("channel name is empty")
+		}
+
+		tplName := strings.TrimSpace(ch.Template)
+		if tplName == "" {
+			tplName = cfg.Template.Default
+		}
+		if tplName != "" && !config.ValidTemplateName(tplName) {
+			return nil, fmt.Errorf("channel %q has invalid template name %q", name, tplName)
+		}
+
+		robotCfgs := make([]config.RobotConfig, 0, len(ch.Robots))
+		for _, r := range ch.Robots {
+			robot, ok := robots[r]
+			if !ok {
+				return nil, fmt.Errorf("channel %q references unknown robot %q", name, r)
+			}
+			robotCfgs = append(robotCfgs, robot)
+		}
+
+		mention := normalizeMention(ch.Mention)
+		rules := router.CompileMentionRules(ch.MentionRules)
+		for i := range rules {
+			rules[i].Mention = normalizeMention(rules[i].Mention)
+		}
+
+		out[name] = Channel{
+			Name:         name,
+			Robots:       robotCfgs,
+			Template:     tplName,
+			Mention:      mention,
+			MentionRules: rules,
+		}
+	}
+	return out, nil
+}
+
+func normalizeMention(m config.MentionConfig) config.MentionConfig {
+	userIds := make([]string, 0, len(m.AtUserIds))
+	seenUserIds := make(map[string]struct{}, len(m.AtUserIds))
+	for _, v := range m.AtUserIds {
+		v = strings.TrimSpace(v)
+		v = strings.TrimPrefix(v, "@")
+		if v == "" {
+			continue
+		}
+		if _, ok := seenUserIds[v]; ok {
+			continue
+		}
+		seenUserIds[v] = struct{}{}
+		userIds = append(userIds, v)
+	}
+	m.AtUserIds = userIds
+
+	mobiles := make([]string, 0, len(m.AtMobiles))
+	seen := make(map[string]struct{}, len(m.AtMobiles))
+	for _, v := range m.AtMobiles {
+		v = strings.TrimSpace(v)
+		v = strings.TrimPrefix(v, "@")
+		if v == "" {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		mobiles = append(mobiles, v)
+	}
+	m.AtMobiles = mobiles
+	return m
+}

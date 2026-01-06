@@ -1,0 +1,1159 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Prometheus DingTalk Hook - Admin</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 16px; }
+      header { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+      header h1 { margin: 0; font-size: 18px; }
+      header .meta { opacity: .75; font-size: 13px; }
+      main { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+      section { border: 1px solid rgba(127,127,127,.35); border-radius: 10px; padding: 12px; }
+      section h2 { margin: 0 0 8px; font-size: 15px; }
+      textarea { width: 100%; min-height: 220px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+      label { display: flex; flex-direction: column; gap: 4px; }
+      button { padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(127,127,127,.35); background: transparent; cursor: pointer; }
+      button:hover { background: rgba(127,127,127,.12); }
+      button.active { background: rgba(127,127,127,.12); }
+      input, select { padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(127,127,127,.35); background: transparent; }
+      pre { white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; margin: 8px 0 0; }
+      .full { grid-column: 1 / -1; }
+      .hidden { display: none; }
+      details { border: 1px solid rgba(127,127,127,.25); border-radius: 10px; padding: 8px 10px; }
+      details + details { margin-top: 10px; }
+      summary { cursor: pointer; font-weight: 600; }
+      .card { border: 1px dashed rgba(127,127,127,.35); border-radius: 10px; padding: 10px; margin-top: 10px; }
+      .muted { opacity: .75; font-size: 12px; }
+      .danger { color: #c0392b; }
+      .var-item { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; padding: 8px; border: 1px solid rgba(127,127,127,.25); border-radius: 10px; margin: 8px 0; }
+      .var-item code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Prometheus DingTalk Hook - Admin</h1>
+      <div class="meta" id="status">加载中…</div>
+    </header>
+
+    <main>
+      <section>
+        <h2>配置（config.yaml）</h2>
+        <div class="row" style="margin-bottom:8px">
+          <button id="btnLoadConfig">加载</button>
+          <button id="btnSaveConfig">保存并重载</button>
+          <button id="btnReload">仅重载</button>
+          <button id="btnExport">导出</button>
+          <label>
+            导入：
+            <input type="file" id="fileImport" accept=".zip" />
+          </label>
+          <span style="flex:1"></span>
+          <button id="btnCfgModeForm" class="active" title="表单模式（推荐）">表单</button>
+          <button id="btnCfgModeYaml" title="高级模式：直接编辑 YAML">YAML</button>
+        </div>
+        <div id="configForm"></div>
+        <textarea id="configText" class="hidden" spellcheck="false"></textarea>
+        <pre id="configMsg"></pre>
+      </section>
+
+      <section>
+        <h2>模板（templates/*.tmpl）</h2>
+        <div class="row" style="margin-bottom:8px">
+          <select id="tplSelect"></select>
+          <button id="btnLoadTpl">加载</button>
+          <button id="btnSaveTpl">保存并重载</button>
+        </div>
+        <textarea id="tplText" spellcheck="false"></textarea>
+        <details style="margin-top:10px">
+          <summary>变量库（点击插入，预览基于下方 payload）</summary>
+          <div class="row" style="margin:8px 0">
+            <input id="varSearch" placeholder="搜索变量/片段…" style="flex:1" />
+            <span class="muted" id="varHint"></span>
+          </div>
+          <div id="varList"></div>
+        </details>
+        <pre id="tplMsg"></pre>
+      </section>
+
+      <section class="full">
+        <h2>预览 / 测试发送</h2>
+        <div class="row" style="margin-bottom:8px">
+          <label>Channel：<input id="channelName" placeholder="default" /></label>
+          <button id="btnRender">渲染预览</button>
+          <button id="btnSend">测试发送</button>
+        </div>
+        <div class="row" style="margin-bottom:8px">
+          <label style="flex:1">示例 payload（JSON）：</label>
+        </div>
+        <textarea id="payloadText" spellcheck="false"></textarea>
+        <pre id="renderOut"></pre>
+      </section>
+    </main>
+
+    <script>
+      const qs = (id) => document.getElementById(id);
+      const statusEl = qs("status");
+      const configText = qs("configText");
+      const configMsg = qs("configMsg");
+      const configForm = qs("configForm");
+      const btnCfgModeForm = qs("btnCfgModeForm");
+      const btnCfgModeYaml = qs("btnCfgModeYaml");
+      const tplSelect = qs("tplSelect");
+      const tplText = qs("tplText");
+      const tplMsg = qs("tplMsg");
+      const varSearch = qs("varSearch");
+      const varHint = qs("varHint");
+      const varList = qs("varList");
+      const payloadText = qs("payloadText");
+      const renderOut = qs("renderOut");
+      const channelName = qs("channelName");
+
+      let configMode = "form";
+      let cfg = null;
+      let cfgSensitive = null;
+      let cfgClear = {
+        auth_token: false,
+        admin_password: false,
+        admin_password_sha256: false,
+        admin_salt: false,
+        robots: {}
+      };
+      let templateNames = [];
+
+      const samplePayload = {
+        receiver: "default",
+        status: "firing",
+        alerts: [
+          {
+            status: "firing",
+            labels: { alertname: "HighCPU", severity: "critical" },
+            annotations: { summary: "cpu too high" }
+          }
+        ],
+        groupLabels: { alertname: "HighCPU" },
+        commonLabels: { alertname: "HighCPU", severity: "critical" },
+        commonAnnotations: { summary: "cpu too high" }
+      };
+      payloadText.value = JSON.stringify(samplePayload, null, 2);
+
+      const tplVars = [
+        { title: "Receiver", snippet: "{{ .Payload.Receiver }}", preview: (p) => p?.receiver },
+        { title: "Status", snippet: "{{ .Payload.Status }}", preview: (p) => p?.status },
+        { title: "ExternalURL", snippet: "{{ .Payload.ExternalURL }}", preview: (p) => p?.externalURL },
+        {
+          title: "FiringCount",
+          snippet: "{{ .FiringCount }}",
+          preview: (p) => (p?.alerts || []).filter((a) => String(a?.status || "").toLowerCase() === "firing").length
+        },
+        {
+          title: "ResolvedCount",
+          snippet: "{{ .ResolvedCount }}",
+          preview: (p) => (p?.alerts || []).filter((a) => String(a?.status || "").toLowerCase() === "resolved").length
+        },
+        { title: "GroupLabels", snippet: "{{ kv .Payload.GroupLabels }}", preview: (p) => formatKV(p?.groupLabels) },
+        { title: "CommonLabels", snippet: "{{ kv .Payload.CommonLabels }}", preview: (p) => formatKV(p?.commonLabels) },
+        { title: "CommonAnnotations", snippet: "{{ kv .Payload.CommonAnnotations }}", preview: (p) => formatKV(p?.commonAnnotations) },
+        { title: "Alerts (range)", snippet: "{{- range $i, $a := .Payload.Alerts }}\n- {{ index $a.Labels \"alertname\" | default \"alert\" }} ({{ $a.Status }})\n{{- end }}", preview: null }
+      ];
+
+      async function api(path, options = {}) {
+        const resp = await fetch(path, options);
+        const ct = resp.headers.get("content-type") || "";
+        if (ct.includes("application/json")) {
+          const body = await resp.json();
+          if (!resp.ok) throw new Error(body.message || resp.statusText);
+          return body;
+        }
+        const text = await resp.text();
+        if (!resp.ok) throw new Error(text || resp.statusText);
+        return text;
+      }
+
+      async function refreshStatus() {
+        try {
+          const res = await api("./api/v1/status");
+          const d = res.data || {};
+          statusEl.textContent = `mode=${d.mode || "-"} | last_reload=${d.reload?.last_success || "-"} ${d.reload?.last_error ? "| err=" + d.reload.last_error : ""}`;
+        } catch (e) {
+          statusEl.textContent = `状态获取失败：${e.message}`;
+        }
+      }
+
+      async function loadTemplates() {
+        try {
+          const res = await api("./api/v1/templates");
+          tplSelect.innerHTML = "";
+          templateNames = res.data?.templates || [];
+          for (const name of templateNames) {
+            const opt = document.createElement("option");
+            opt.value = name;
+            opt.textContent = name;
+            tplSelect.appendChild(opt);
+          }
+        } catch (e) {
+          tplMsg.textContent = e.message;
+        }
+      }
+
+      function escapeHtml(s) {
+        return String(s ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll("\"", "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function splitList(s) {
+        return String(s || "")
+          .split(/[\n,\t ]+/)
+          .map((v) => v.trim())
+          .filter(Boolean);
+      }
+
+      function joinList(xs) {
+        return (xs || []).filter(Boolean).join(", ");
+      }
+
+      function formatKV(obj) {
+        if (!obj || typeof obj !== "object") return "";
+        const keys = Object.keys(obj).sort();
+        return keys.map((k) => `${k}=${obj[k]}`).join(" ");
+      }
+
+      function tryParsePayload() {
+        const raw = String(payloadText.value || "").trim();
+        if (!raw) return { ok: false, err: "payload 为空" };
+        try {
+          const parsed = JSON.parse(raw);
+          return { ok: true, payload: parsed };
+        } catch (e) {
+          return { ok: false, err: e.message };
+        }
+      }
+
+      function formatPreview(v) {
+        if (v == null) return "";
+        if (typeof v === "string") return v;
+        if (typeof v === "number" || typeof v === "boolean") return String(v);
+        try {
+          const s = JSON.stringify(v);
+          return s.length > 140 ? s.slice(0, 140) + "…" : s;
+        } catch {
+          return String(v);
+        }
+      }
+
+      function insertAtCursor(textarea, text) {
+        const start = textarea.selectionStart ?? textarea.value.length;
+        const end = textarea.selectionEnd ?? textarea.value.length;
+        textarea.setRangeText(text, start, end, "end");
+        textarea.focus();
+      }
+
+      function renderVarList() {
+        const q = String(varSearch.value || "").trim().toLowerCase();
+        const parsed = tryParsePayload();
+
+        if (!parsed.ok) {
+          varHint.textContent = `预览不可用：${parsed.err}`;
+        } else {
+          varHint.textContent = "";
+        }
+
+        const payload = parsed.ok ? parsed.payload : null;
+        const items = tplVars
+          .map((it, index) => ({ it, index }))
+          .filter(({ it }) => {
+            if (!q) return true;
+            return String(it.title).toLowerCase().includes(q) || String(it.snippet).toLowerCase().includes(q);
+          });
+
+        varList.innerHTML = items
+          .map(({ it, index }) => {
+            const pv = payload && typeof it.preview === "function" ? formatPreview(it.preview(payload)) : "";
+            return `<div class="var-item">
+              <div>
+                <div><strong>${escapeHtml(it.title)}</strong></div>
+                <div><code>${escapeHtml(it.snippet)}</code></div>
+                ${pv ? `<div class="muted" style="margin-top:6px">预览：${escapeHtml(pv)}</div>` : ``}
+              </div>
+              <div class="row">
+                <button data-action="insertVar" data-var-index="${index}">插入</button>
+              </div>
+            </div>`;
+          })
+          .join("");
+      }
+
+      function setByPath(obj, path, value) {
+        const parts = String(path).split(".").filter(Boolean);
+        let cur = obj;
+        for (let i = 0; i < parts.length - 1; i++) {
+          const raw = parts[i];
+          const key = /^\d+$/.test(raw) ? Number(raw) : raw;
+          if (cur[key] == null) {
+            const nextRaw = parts[i + 1];
+            cur[key] = /^\d+$/.test(nextRaw) ? [] : {};
+          }
+          cur = cur[key];
+        }
+        const lastRaw = parts[parts.length - 1];
+        const lastKey = /^\d+$/.test(lastRaw) ? Number(lastRaw) : lastRaw;
+        cur[lastKey] = value;
+      }
+
+      function getByPath(obj, path) {
+        const parts = String(path).split(".").filter(Boolean);
+        let cur = obj;
+        for (const raw of parts) {
+          const key = /^\d+$/.test(raw) ? Number(raw) : raw;
+          cur = cur?.[key];
+        }
+        return cur;
+      }
+
+      function ensureDefaultChannelAndReceiver() {
+        if (!cfg?.DingTalk) return;
+        const robots = cfg.DingTalk.Robots || [];
+        const firstRobot = robots.find((r) => String(r?.Name || "").trim())?.Name || "";
+
+        const hasChannels = (cfg.DingTalk.Channels || []).length > 0;
+        if (hasChannels) {
+          const names = new Set((cfg.DingTalk.Channels || []).map((c) => c?.Name));
+          if (!names.has("default")) {
+            cfg.DingTalk.Channels.unshift({
+              Name: "default",
+              Robots: firstRobot ? [firstRobot] : [],
+              Template: cfg.Template?.Default || "default",
+              Mention: { AtAll: false, AtMobiles: [], AtUserIds: [] },
+              MentionRules: []
+            });
+          }
+          return;
+        }
+
+        cfg.DingTalk.Receivers = cfg.DingTalk.Receivers || {};
+        if (!cfg.DingTalk.Receivers.default) {
+          cfg.DingTalk.Receivers.default = firstRobot ? [firstRobot] : [];
+        }
+      }
+
+      function renderConfigForm() {
+        if (!cfg) {
+          configForm.innerHTML = `<div class="muted">未加载配置。</div>`;
+          return;
+        }
+
+        const e = escapeHtml;
+        const server = cfg.Server || {};
+        const auth = cfg.Auth || {};
+        const admin = cfg.Admin || {};
+        const basic = admin.BasicAuth || {};
+        const reload = cfg.Reload || {};
+        const tpl = cfg.Template || {};
+        const dt = cfg.DingTalk || {};
+        const robots = dt.Robots || [];
+        const channels = dt.Channels || [];
+        const routes = dt.Routes || [];
+        const receivers = dt.Receivers || {};
+
+        const sens = cfgSensitive || {};
+        const sensRobots = sens.robots || sens.Robots || {};
+        const authTokenSet = !!(sens.auth_token_set ?? sens.AuthTokenSet);
+        const adminPwdSet = !!(sens.admin_password_set ?? sens.AdminPasswordSet);
+        const adminShaSet = !!(sens.admin_password_sha256_set ?? sens.AdminPasswordSHA256Set);
+        const adminSaltSet = !!(sens.admin_salt_set ?? sens.AdminSaltSet);
+
+        const hasChannelsMode = channels.length > 0;
+
+        const robotNames = robots.map((r) => String(r?.Name || "")).filter(Boolean);
+        const templateNameOptions = ["", ...templateNames].map((name) => `<option value="${e(name)}">${name ? e(name) : "(默认)"}</option>`).join("");
+
+        const renderNameCheckboxes = (listPath, selected) => {
+          return robotNames
+            .map((name) => {
+              const checked = (selected || []).includes(name) ? "checked" : "";
+              return `<label style="flex-direction:row;align-items:center;gap:6px">
+                <input type="checkbox" data-toggle-array="${e(listPath)}" data-value="${e(name)}" ${checked} />
+                <span>${e(name)}</span>
+              </label>`;
+            })
+            .join("");
+        };
+
+        const renderChannelsCheckboxes = (listPath, selected) => {
+          const channelNames = channels.map((c) => String(c?.Name || "")).filter(Boolean);
+          return channelNames
+            .map((name) => {
+              const checked = (selected || []).includes(name) ? "checked" : "";
+              return `<label style="flex-direction:row;align-items:center;gap:6px">
+                <input type="checkbox" data-toggle-array="${e(listPath)}" data-value="${e(name)}" ${checked} />
+                <span>${e(name)}</span>
+              </label>`;
+            })
+            .join("");
+        };
+
+        const renderLabelsEditor = (labelsPath, labelsObj) => {
+          const labels = labelsObj || {};
+          const keys = Object.keys(labels).sort();
+          const rows = keys
+            .map((k) => {
+              const values = Array.isArray(labels[k]) ? labels[k] : [];
+              return `<div class="grid" style="grid-template-columns: 1fr 2fr auto; align-items:end">
+                <label>key<input value="${e(k)}" data-label-key="${e(labelsPath)}" data-label-oldkey="${e(k)}" /></label>
+                <label>values<input value="${e(joinList(values))}" data-label-values="${e(labelsPath)}" data-label-keyname="${e(k)}" placeholder="a, b, c" /></label>
+                <button data-action="removeLabel" data-path="${e(labelsPath)}" data-key="${e(k)}">删除</button>
+              </div>`;
+            })
+            .join("");
+          return `<div class="card">
+            <div class="row" style="margin-bottom:8px">
+              <div style="font-weight:600">labels</div>
+              <span style="flex:1"></span>
+              <button data-action="addLabel" data-path="${e(labelsPath)}">+ label</button>
+            </div>
+            ${rows || `<div class="muted">无 labels</div>`}
+          </div>`;
+        };
+
+        const renderWhenEditor = (whenPath, whenObj) => {
+          const when = whenObj || {};
+          return `<div class="card">
+            <div class="grid">
+              <label>receiver<input value="${e(joinList(when.Receiver))}" data-bind="${e(whenPath + ".Receiver")}" data-kind="list" placeholder="a, b" /></label>
+              <label>status<input value="${e(joinList(when.Status))}" data-bind="${e(whenPath + ".Status")}" data-kind="list" placeholder="firing, resolved" /></label>
+            </div>
+            ${renderLabelsEditor(whenPath + ".Labels", when.Labels)}
+          </div>`;
+        };
+
+        const renderMentionEditor = (mentionPath, mentionObj) => {
+          const m = mentionObj || {};
+          return `<div class="card">
+            <div class="grid">
+              <label style="flex-direction:row;align-items:center;gap:6px">
+                <input type="checkbox" data-bind="${e(mentionPath + ".AtAll")}" data-kind="bool" ${m.AtAll ? "checked" : ""} />
+                <span>at_all</span>
+              </label>
+              <label>at_mobiles<input value="${e(joinList(m.AtMobiles))}" data-bind="${e(mentionPath + ".AtMobiles")}" data-kind="list" placeholder="13800138000, 139..." /></label>
+              <label>at_user_ids<input value="${e(joinList(m.AtUserIds))}" data-bind="${e(mentionPath + ".AtUserIds")}" data-kind="list" placeholder="user123, user456" /></label>
+            </div>
+          </div>`;
+        };
+
+        const robotsHTML = robots
+          .map((r, i) => {
+            const name = String(r?.Name || "");
+            const rs = sensRobots[name] || {};
+            const webhookSet = !!(rs.webhook_set ?? rs.WebhookSet);
+            const secretSet = !!(rs.secret_set ?? rs.SecretSet);
+            const clear = cfgClear.robots[name] || {};
+
+            return `<div class="card">
+              <div class="row" style="margin-bottom:8px">
+                <div style="font-weight:600">robot #${i + 1}${name ? "："+e(name) : ""}</div>
+                <span style="flex:1"></span>
+                <button data-action="removeRobot" data-index="${i}">删除</button>
+              </div>
+              <div class="grid">
+                <label>name<input value="${e(r?.Name)}" data-bind="DingTalk.Robots.${i}.Name" /></label>
+                <label>webhook
+                  <input id="robot_${i}_webhook" type="password" value="${e(r?.Webhook)}" data-bind="DingTalk.Robots.${i}.Webhook" placeholder="${webhookSet ? "(已设置，留空=不改)" : ""}" />
+                  <div class="row">
+                    <label style="flex-direction:row;align-items:center;gap:6px">
+                      <input type="checkbox" data-toggle-pass="robot_${i}_webhook" />显示
+                    </label>
+                    <label style="flex-direction:row;align-items:center;gap:6px">
+                      <input type="checkbox" data-clear-robot="${e(name)}" data-clear-field="webhook" ${clear.webhook ? "checked" : ""} ${webhookSet ? "" : "disabled"} />
+                      清空
+                    </label>
+                  </div>
+                </label>
+                <label>secret
+                  <input id="robot_${i}_secret" type="password" value="${e(r?.Secret)}" data-bind="DingTalk.Robots.${i}.Secret" placeholder="${secretSet ? "(已设置，留空=不改)" : ""}" />
+                  <div class="row">
+                    <label style="flex-direction:row;align-items:center;gap:6px">
+                      <input type="checkbox" data-toggle-pass="robot_${i}_secret" />显示
+                    </label>
+                    <label style="flex-direction:row;align-items:center;gap:6px">
+                      <input type="checkbox" data-clear-robot="${e(name)}" data-clear-field="secret" ${clear.secret ? "checked" : ""} ${secretSet ? "" : "disabled"} />
+                      清空
+                    </label>
+                  </div>
+                </label>
+                <label>msg_type
+                  <select data-bind="DingTalk.Robots.${i}.MsgType">
+                    <option value="markdown" ${r?.MsgType === "markdown" ? "selected" : ""}>markdown</option>
+                    <option value="text" ${r?.MsgType === "text" ? "selected" : ""}>text</option>
+                  </select>
+                </label>
+                <label>title<input value="${e(r?.Title)}" data-bind="DingTalk.Robots.${i}.Title" /></label>
+              </div>
+            </div>`;
+          })
+          .join("");
+
+        const receiversKeys = Object.keys(receivers || {}).sort();
+        const receiversHTML = receiversKeys
+          .map((receiver) => {
+            const selected = receivers[receiver] || [];
+            return `<div class="card">
+              <div class="row" style="margin-bottom:8px">
+                <div style="font-weight:600">receiver：${e(receiver)}</div>
+                <span style="flex:1"></span>
+                <button data-action="removeReceiver" data-receiver="${e(receiver)}">删除</button>
+              </div>
+              <div class="grid">
+                <div>
+                  <div class="muted" style="margin-bottom:6px">robots</div>
+                  <div class="row">${renderNameCheckboxes(`DingTalk.Receivers.${receiver}`, selected)}</div>
+                </div>
+              </div>
+            </div>`;
+          })
+          .join("");
+
+        const channelsHTML = channels
+          .map((ch, i) => {
+            return `<div class="card">
+              <div class="row" style="margin-bottom:8px">
+                <div style="font-weight:600">channel #${i + 1}${ch?.Name ? "："+e(ch.Name) : ""}</div>
+                <span style="flex:1"></span>
+                <button data-action="removeChannel" data-index="${i}">删除</button>
+              </div>
+              <div class="grid">
+                <label>name<input value="${e(ch?.Name)}" data-bind="DingTalk.Channels.${i}.Name" /></label>
+                <label>template
+                  <select data-bind="DingTalk.Channels.${i}.Template">${templateNameOptions}</select>
+                </label>
+              </div>
+              <div class="card">
+                <div class="muted" style="margin-bottom:6px">robots</div>
+                <div class="row">${renderNameCheckboxes(`DingTalk.Channels.${i}.Robots`, ch?.Robots || [])}</div>
+              </div>
+              ${renderMentionEditor(`DingTalk.Channels.${i}.Mention`, ch?.Mention)}
+              <div class="card">
+                <div class="row" style="margin-bottom:8px">
+                  <div style="font-weight:600">mention_rules</div>
+                  <span style="flex:1"></span>
+                  <button data-action="addMentionRule" data-channel-index="${i}">+ rule</button>
+                </div>
+                ${(ch?.MentionRules || [])
+                  .map((rule, ri) => {
+                    return `<div class="card">
+                      <div class="row" style="margin-bottom:8px">
+                        <div style="font-weight:600">rule #${ri + 1}${rule?.Name ? "："+e(rule.Name) : ""}</div>
+                        <span style="flex:1"></span>
+                        <button data-action="removeMentionRule" data-channel-index="${i}" data-rule-index="${ri}">删除</button>
+                      </div>
+                      <div class="grid">
+                        <label>name<input value="${e(rule?.Name)}" data-bind="DingTalk.Channels.${i}.MentionRules.${ri}.Name" /></label>
+                      </div>
+                      ${renderWhenEditor(`DingTalk.Channels.${i}.MentionRules.${ri}.When`, rule?.When)}
+                      ${renderMentionEditor(`DingTalk.Channels.${i}.MentionRules.${ri}.Mention`, rule?.Mention)}
+                    </div>`;
+                  })
+                  .join("") || `<div class="muted">无规则</div>`}
+              </div>
+            </div>`;
+          })
+          .join("");
+
+        const routesHTML = routes
+          .map((route, i) => {
+            return `<div class="card">
+              <div class="row" style="margin-bottom:8px">
+                <div style="font-weight:600">route #${i + 1}${route?.Name ? "："+e(route.Name) : ""}</div>
+                <span style="flex:1"></span>
+                <button data-action="removeRoute" data-index="${i}">删除</button>
+              </div>
+              <div class="grid">
+                <label>name<input value="${e(route?.Name)}" data-bind="DingTalk.Routes.${i}.Name" /></label>
+              </div>
+              ${renderWhenEditor(`DingTalk.Routes.${i}.When`, route?.When)}
+              <div class="card">
+                <div class="muted" style="margin-bottom:6px">channels</div>
+                <div class="row">${renderChannelsCheckboxes(`DingTalk.Routes.${i}.Channels`, route?.Channels || [])}</div>
+              </div>
+            </div>`;
+          })
+          .join("");
+
+        const adminAuthMode = adminShaSet ? "sha256" : "password";
+
+        configForm.innerHTML = `
+          <div class="muted" style="margin-bottom:10px">表单模式会重写 config.yaml（可能丢失注释/顺序）；敏感字段默认不回显，留空表示不修改旧值。</div>
+
+          <details open>
+            <summary>Server</summary>
+            <div class="grid" style="margin-top:10px">
+              <label>listen<input value="${e(server.Listen)}" data-bind="Server.Listen" /></label>
+              <label>path<input value="${e(server.Path)}" data-bind="Server.Path" /></label>
+              <label>read_timeout<input value="${e(server.ReadTimeout)}" data-bind="Server.ReadTimeout" placeholder="5s" /></label>
+              <label>write_timeout<input value="${e(server.WriteTimeout)}" data-bind="Server.WriteTimeout" placeholder="10s" /></label>
+              <label>idle_timeout<input value="${e(server.IdleTimeout)}" data-bind="Server.IdleTimeout" placeholder="60s" /></label>
+              <label>max_body_bytes<input type="number" value="${e(server.MaxBodyBytes)}" data-bind="Server.MaxBodyBytes" /></label>
+            </div>
+          </details>
+
+          <details>
+            <summary>Auth</summary>
+            <div class="grid" style="margin-top:10px">
+              <label>token
+                <input id="auth_token" type="password" value="${e(auth.Token)}" data-bind="Auth.Token" placeholder="${authTokenSet ? "(已设置，留空=不改)" : ""}" />
+                <div class="row">
+                  <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-toggle-pass="auth_token" />显示</label>
+                  <label style="flex-direction:row;align-items:center;gap:6px">
+                    <input type="checkbox" data-clear="auth_token" ${cfgClear.auth_token ? "checked" : ""} ${authTokenSet ? "" : "disabled"} />
+                    清空
+                  </label>
+                </div>
+              </label>
+            </div>
+          </details>
+
+          <details>
+            <summary>Template</summary>
+            <div class="grid" style="margin-top:10px">
+              <label>dir<input value="${e(tpl.Dir)}" data-bind="Template.Dir" placeholder="templates" /></label>
+              <label>file<input value="${e(tpl.File)}" data-bind="Template.File" placeholder="templates/default.tmpl" /></label>
+              <label>default<input value="${e(tpl.Default)}" data-bind="Template.Default" placeholder="default" /></label>
+            </div>
+            <div class="muted" style="margin-top:6px">注意：template.dir 与 template.file 互斥；留空则使用内置 default。</div>
+          </details>
+
+          <details>
+            <summary>Admin</summary>
+            <div class="grid" style="margin-top:10px">
+              <label style="flex-direction:row;align-items:center;gap:6px">
+                <input type="checkbox" data-bind="Admin.Enabled" data-kind="bool" ${admin.Enabled ? "checked" : ""} />
+                <span>enabled</span>
+              </label>
+              <label>path_prefix<input value="${e(admin.PathPrefix)}" data-bind="Admin.PathPrefix" placeholder="/admin" /></label>
+              <label>basic_auth.username<input value="${e(basic.Username)}" data-bind="Admin.BasicAuth.Username" /></label>
+            </div>
+            <div class="card">
+              <div class="row" style="margin-bottom:8px">
+                <div style="font-weight:600">basic_auth</div>
+                <span class="muted">（password 与 password_sha256 互斥）</span>
+              </div>
+              <div class="grid">
+                <label>password
+                  <input id="admin_pwd" type="password" value="${e(basic.Password)}" data-bind="Admin.BasicAuth.Password" placeholder="${adminPwdSet ? "(已设置，留空=不改)" : ""}" />
+                  <div class="row">
+                    <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-toggle-pass="admin_pwd" />显示</label>
+                    <label style="flex-direction:row;align-items:center;gap:6px">
+                      <input type="checkbox" data-clear="admin_password" ${cfgClear.admin_password ? "checked" : ""} ${adminPwdSet ? "" : "disabled"} />
+                      清空
+                    </label>
+                  </div>
+                </label>
+                <label>password_sha256
+                  <input id="admin_sha" type="password" value="${e(basic.PasswordSHA256)}" data-bind="Admin.BasicAuth.PasswordSHA256" placeholder="${adminShaSet ? "(已设置，留空=不改)" : ""}" />
+                  <div class="row">
+                    <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-toggle-pass="admin_sha" />显示</label>
+                    <label style="flex-direction:row;align-items:center;gap:6px">
+                      <input type="checkbox" data-clear="admin_password_sha256" ${cfgClear.admin_password_sha256 ? "checked" : ""} ${adminShaSet ? "" : "disabled"} />
+                      清空
+                    </label>
+                  </div>
+                </label>
+                <label>salt (base64)
+                  <input id="admin_salt" type="password" value="${e(basic.Salt)}" data-bind="Admin.BasicAuth.Salt" placeholder="${adminSaltSet ? "(已设置，留空=不改)" : ""}" />
+                  <div class="row">
+                    <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-toggle-pass="admin_salt" />显示</label>
+                    <label style="flex-direction:row;align-items:center;gap:6px">
+                      <input type="checkbox" data-clear="admin_salt" ${cfgClear.admin_salt ? "checked" : ""} ${adminSaltSet ? "" : "disabled"} />
+                      清空
+                    </label>
+                  </div>
+                </label>
+              </div>
+              <div class="muted">提示：切换认证方式时，建议先勾选“清空”另一种方式再填写新值。</div>
+            </div>
+          </details>
+
+          <details>
+            <summary>Reload</summary>
+            <div class="grid" style="margin-top:10px">
+              <label style="flex-direction:row;align-items:center;gap:6px">
+                <input type="checkbox" data-bind="Reload.Enabled" data-kind="bool" ${reload.Enabled ? "checked" : ""} />
+                <span>enabled</span>
+              </label>
+              <label>interval<input value="${e(reload.Interval)}" data-bind="Reload.Interval" placeholder="2s" /></label>
+            </div>
+          </details>
+
+          <details open>
+            <summary>DingTalk</summary>
+            <div class="grid" style="margin-top:10px">
+              <label>timeout<input value="${e(dt.Timeout)}" data-bind="DingTalk.Timeout" placeholder="5s" /></label>
+              <label style="flex-direction:row;align-items:center;gap:6px">
+                <input type="checkbox" data-action="toggleRoutingMode" ${hasChannelsMode ? "checked" : ""} />
+                <span>使用 channels/routes（推荐）</span>
+              </label>
+            </div>
+
+            <div class="card">
+              <div class="row" style="margin-bottom:8px">
+                <div style="font-weight:600">robots</div>
+                <span style="flex:1"></span>
+                <button data-action="addRobot">+ robot</button>
+              </div>
+              ${robotsHTML || `<div class="muted">无 robots（但后端校验要求至少 1 个）</div>`}
+            </div>
+
+            <div class="card ${hasChannelsMode ? "hidden" : ""}">
+              <div class="row" style="margin-bottom:8px">
+                <div style="font-weight:600">receivers（legacy）</div>
+                <span style="flex:1"></span>
+                <button data-action="addReceiver">+ receiver</button>
+              </div>
+              ${receiversHTML || `<div class="muted">无 receivers（legacy 模式要求包含 default）</div>`}
+            </div>
+
+            <div class="card ${hasChannelsMode ? "" : "hidden"}">
+              <div class="row" style="margin-bottom:8px">
+                <div style="font-weight:600">channels</div>
+                <span style="flex:1"></span>
+                <button data-action="addChannel">+ channel</button>
+              </div>
+              ${channelsHTML || `<div class="muted">无 channels（channels 模式要求包含 default）</div>`}
+            </div>
+
+            <div class="card ${hasChannelsMode ? "" : "hidden"}">
+              <div class="row" style="margin-bottom:8px">
+                <div style="font-weight:600">routes</div>
+                <span style="flex:1"></span>
+                <button data-action="addRoute">+ route</button>
+              </div>
+              ${routesHTML || `<div class="muted">无 routes（允许为空）</div>`}
+            </div>
+          </details>
+        `;
+
+        for (let i = 0; i < channels.length; i++) {
+          const sel = configForm.querySelector(`select[data-bind="DingTalk.Channels.${i}.Template"]`);
+          if (sel) sel.value = String(channels[i]?.Template || "");
+        }
+      }
+
+      function setConfigMode(mode) {
+        configMode = mode;
+        btnCfgModeForm.classList.toggle("active", mode === "form");
+        btnCfgModeYaml.classList.toggle("active", mode === "yaml");
+        configForm.classList.toggle("hidden", mode !== "form");
+        configText.classList.toggle("hidden", mode !== "yaml");
+      }
+
+      btnCfgModeForm.onclick = () => setConfigMode("form");
+      btnCfgModeYaml.onclick = () => setConfigMode("yaml");
+
+      async function loadConfig() {
+        configMsg.textContent = "";
+        try {
+          const [jsonRes, yamlText] = await Promise.all([api("./api/v1/config/json"), api("./api/v1/config")]);
+          cfg = jsonRes.data?.config || null;
+          cfgSensitive = jsonRes.data?.sensitive || null;
+          cfgClear = { auth_token: false, admin_password: false, admin_password_sha256: false, admin_salt: false, robots: {} };
+          configText.value = yamlText || "";
+          ensureDefaultChannelAndReceiver();
+          renderConfigForm();
+        } catch (e) {
+          configMsg.textContent = e.message;
+        }
+      }
+
+      qs("btnLoadConfig").onclick = loadConfig;
+
+      qs("btnSaveConfig").onclick = async () => {
+        configMsg.textContent = "";
+        try {
+          if (configMode === "yaml") {
+            await api("./api/v1/config", { method: "PUT", body: configText.value, headers: { "content-type": "text/yaml" } });
+          } else {
+            if (!cfg) throw new Error("config not loaded");
+            await api("./api/v1/config/json", {
+              method: "PUT",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ config: cfg, clear_sensitive: cfgClear })
+            });
+          }
+          configMsg.textContent = "已保存并重载。";
+          await refreshStatus();
+          await loadTemplates();
+          await loadConfig();
+        } catch (e) {
+          configMsg.textContent = e.message;
+        }
+      };
+
+      qs("btnReload").onclick = async () => {
+        configMsg.textContent = "";
+        try {
+          await api("./api/v1/reload", { method: "POST" });
+          configMsg.textContent = "已重载。";
+          await refreshStatus();
+          await loadTemplates();
+          await loadConfig();
+        } catch (e) {
+          configMsg.textContent = e.message;
+        }
+      };
+
+      qs("btnLoadTpl").onclick = async () => {
+        tplMsg.textContent = "";
+        try {
+          const name = tplSelect.value;
+          const text = await api(`./api/v1/templates/${encodeURIComponent(name)}`);
+          tplText.value = text;
+        } catch (e) {
+          tplMsg.textContent = e.message;
+        }
+      };
+
+      qs("btnSaveTpl").onclick = async () => {
+        tplMsg.textContent = "";
+        try {
+          const name = tplSelect.value;
+          await api(`./api/v1/templates/${encodeURIComponent(name)}`, { method: "PUT", body: tplText.value, headers: { "content-type": "text/plain" } });
+          tplMsg.textContent = "已保存并重载。";
+          await refreshStatus();
+        } catch (e) {
+          tplMsg.textContent = e.message;
+        }
+      };
+
+      varSearch.oninput = renderVarList;
+      payloadText.addEventListener("input", () => {
+        window.clearTimeout(payloadText.__t);
+        payloadText.__t = window.setTimeout(renderVarList, 150);
+      });
+      varList.addEventListener("click", (ev) => {
+        const btn = ev.target instanceof HTMLElement ? ev.target.closest("button") : null;
+        if (!btn) return;
+        if (btn.dataset.action !== "insertVar") return;
+        const idx = Number(btn.dataset.varIndex);
+        const item = tplVars[idx];
+        if (!item) return;
+        insertAtCursor(tplText, item.snippet);
+      });
+
+      qs("btnRender").onclick = async () => {
+        renderOut.textContent = "";
+        try {
+          const payload = JSON.parse(payloadText.value || "{}");
+          const res = await api("./api/v1/render", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ channel: channelName.value, payload }) });
+          renderOut.textContent = res.data?.content || "";
+        } catch (e) {
+          renderOut.textContent = e.message;
+        }
+      };
+
+      qs("btnSend").onclick = async () => {
+        renderOut.textContent = "";
+        try {
+          const payload = JSON.parse(payloadText.value || "{}");
+          await api("./api/v1/send", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ channel: channelName.value, payload }) });
+          renderOut.textContent = "发送成功。";
+        } catch (e) {
+          renderOut.textContent = e.message;
+        }
+      };
+
+      qs("btnExport").onclick = async () => {
+        configMsg.textContent = "";
+        try {
+          const resp = await fetch("./api/v1/export");
+          if (!resp.ok) throw new Error(await resp.text());
+          const blob = await resp.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "prometheus-dingtalk-hook-export.zip";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          configMsg.textContent = e.message;
+        }
+      };
+
+      qs("fileImport").onchange = async (e) => {
+        configMsg.textContent = "";
+        const f = e.target.files?.[0];
+        if (!f) return;
+        try {
+          const body = await f.arrayBuffer();
+          await api("./api/v1/import", { method: "POST", headers: { "content-type": "application/zip" }, body });
+          configMsg.textContent = "导入成功（已重载）。";
+          await refreshStatus();
+          await loadTemplates();
+          await loadConfig();
+        } catch (err) {
+          configMsg.textContent = err.message;
+        } finally {
+          e.target.value = "";
+        }
+      };
+
+      configForm.addEventListener("input", (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLInputElement || t instanceof HTMLSelectElement)) return;
+
+        if (t.dataset?.bind) {
+          const path = t.dataset.bind;
+          let value;
+          if (t.dataset.kind === "bool") {
+            value = !!t.checked;
+          } else if (t.dataset.kind === "list") {
+            value = splitList(t.value);
+          } else if (t.type === "number") {
+            value = t.value === "" ? 0 : Number(t.value);
+          } else {
+            value = t.value;
+          }
+          setByPath(cfg, path, value);
+          return;
+        }
+
+        if (t.dataset?.toggleArray) {
+          const listPath = t.dataset.toggleArray;
+          const item = t.dataset.value;
+          const cur = getByPath(cfg, listPath) || [];
+          const next = Array.isArray(cur) ? [...cur] : [];
+          const idx = next.indexOf(item);
+          if (t.checked && idx === -1) next.push(item);
+          if (!t.checked && idx >= 0) next.splice(idx, 1);
+          setByPath(cfg, listPath, next);
+          return;
+        }
+
+        if (t.dataset?.clear) {
+          cfgClear[t.dataset.clear] = !!t.checked;
+          return;
+        }
+
+        if (t.dataset?.clearRobot) {
+          const name = t.dataset.clearRobot;
+          const field = t.dataset.clearField;
+          cfgClear.robots[name] = cfgClear.robots[name] || {};
+          cfgClear.robots[name][field] = !!t.checked;
+          return;
+        }
+
+        if (t.dataset?.togglePass) {
+          const id = t.dataset.togglePass;
+          const input = qs(id);
+          if (input) input.type = t.checked ? "text" : "password";
+          return;
+        }
+      });
+
+      configForm.addEventListener("change", (ev) => {
+        const t = ev.target;
+        if (t instanceof HTMLInputElement || t instanceof HTMLSelectElement) {
+          if (t.dataset?.bind && String(t.dataset.bind).endsWith(".Name")) {
+            renderConfigForm();
+            return;
+          }
+        }
+        if (!(t instanceof HTMLInputElement)) return;
+        if (t.dataset?.action === "toggleRoutingMode") {
+          const enable = t.checked;
+          cfg.DingTalk = cfg.DingTalk || {};
+          if (enable) {
+            cfg.DingTalk.Receivers = cfg.DingTalk.Receivers || {};
+            cfg.DingTalk.Channels = cfg.DingTalk.Channels || [];
+            cfg.DingTalk.Routes = cfg.DingTalk.Routes || [];
+            if (cfg.DingTalk.Channels.length === 0) {
+              const robots = cfg.DingTalk.Robots || [];
+              const firstRobot = robots.find((r) => String(r?.Name || "").trim())?.Name || "";
+              cfg.DingTalk.Channels.push({
+                Name: "default",
+                Robots: firstRobot ? [firstRobot] : [],
+                Template: cfg.Template?.Default || "default",
+                Mention: { AtAll: false, AtMobiles: [], AtUserIds: [] },
+                MentionRules: []
+              });
+            }
+          } else {
+            cfg.DingTalk.Channels = [];
+            cfg.DingTalk.Routes = [];
+            cfg.DingTalk.Receivers = cfg.DingTalk.Receivers || {};
+            if (!cfg.DingTalk.Receivers.default) {
+              const robots = cfg.DingTalk.Robots || [];
+              const firstRobot = robots.find((r) => String(r?.Name || "").trim())?.Name || "";
+              cfg.DingTalk.Receivers.default = firstRobot ? [firstRobot] : [];
+            }
+          }
+          renderConfigForm();
+        }
+      });
+
+      configForm.addEventListener("click", (ev) => {
+        const btn = ev.target instanceof HTMLElement ? ev.target.closest("button") : null;
+        if (!btn) return;
+        const act = btn.dataset.action;
+        if (!act) return;
+        ev.preventDefault();
+
+        cfg.DingTalk = cfg.DingTalk || {};
+
+        if (act === "addRobot") {
+          cfg.DingTalk.Robots = cfg.DingTalk.Robots || [];
+          cfg.DingTalk.Robots.push({ Name: "", Webhook: "", Secret: "", MsgType: "markdown", Title: "Alertmanager" });
+          renderConfigForm();
+          return;
+        }
+        if (act === "removeRobot") {
+          const idx = Number(btn.dataset.index);
+          cfg.DingTalk.Robots.splice(idx, 1);
+          renderConfigForm();
+          return;
+        }
+
+        if (act === "addReceiver") {
+          const name = prompt("receiver 名称（如 ops-team）");
+          if (!name) return;
+          cfg.DingTalk.Receivers = cfg.DingTalk.Receivers || {};
+          if (cfg.DingTalk.Receivers[name]) {
+            alert("receiver 已存在");
+            return;
+          }
+          cfg.DingTalk.Receivers[name] = [];
+          renderConfigForm();
+          return;
+        }
+        if (act === "removeReceiver") {
+          const name = btn.dataset.receiver;
+          if (!name) return;
+          delete cfg.DingTalk.Receivers[name];
+          renderConfigForm();
+          return;
+        }
+
+        if (act === "addChannel") {
+          cfg.DingTalk.Channels = cfg.DingTalk.Channels || [];
+          cfg.DingTalk.Channels.push({
+            Name: "",
+            Robots: [],
+            Template: "",
+            Mention: { AtAll: false, AtMobiles: [], AtUserIds: [] },
+            MentionRules: []
+          });
+          renderConfigForm();
+          return;
+        }
+        if (act === "removeChannel") {
+          const idx = Number(btn.dataset.index);
+          cfg.DingTalk.Channels.splice(idx, 1);
+          renderConfigForm();
+          return;
+        }
+
+        if (act === "addRoute") {
+          cfg.DingTalk.Routes = cfg.DingTalk.Routes || [];
+          cfg.DingTalk.Routes.push({ Name: "", When: { Receiver: [], Status: [], Labels: {} }, Channels: [] });
+          renderConfigForm();
+          return;
+        }
+        if (act === "removeRoute") {
+          const idx = Number(btn.dataset.index);
+          cfg.DingTalk.Routes.splice(idx, 1);
+          renderConfigForm();
+          return;
+        }
+
+        if (act === "addMentionRule") {
+          const chIdx = Number(btn.dataset.channelIndex);
+          const rules = cfg.DingTalk.Channels?.[chIdx]?.MentionRules || [];
+          rules.push({ Name: "", When: { Receiver: [], Status: [], Labels: {} }, Mention: { AtAll: false, AtMobiles: [], AtUserIds: [] } });
+          cfg.DingTalk.Channels[chIdx].MentionRules = rules;
+          renderConfigForm();
+          return;
+        }
+        if (act === "removeMentionRule") {
+          const chIdx = Number(btn.dataset.channelIndex);
+          const ri = Number(btn.dataset.ruleIndex);
+          cfg.DingTalk.Channels[chIdx].MentionRules.splice(ri, 1);
+          renderConfigForm();
+          return;
+        }
+
+        if (act === "addLabel") {
+          const labelsPath = btn.dataset.path;
+          const labels = getByPath(cfg, labelsPath) || {};
+          const key = prompt("label key（如 severity）");
+          if (!key) return;
+          if (labels[key]) {
+            alert("label 已存在");
+            return;
+          }
+          labels[key] = [];
+          setByPath(cfg, labelsPath, labels);
+          renderConfigForm();
+          return;
+        }
+        if (act === "removeLabel") {
+          const labelsPath = btn.dataset.path;
+          const key = btn.dataset.key;
+          const labels = getByPath(cfg, labelsPath) || {};
+          delete labels[key];
+          setByPath(cfg, labelsPath, labels);
+          renderConfigForm();
+          return;
+        }
+      });
+
+      configForm.addEventListener("blur", (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLInputElement)) return;
+        if (t.dataset?.labelKey) {
+          const labelsPath = t.dataset.labelKey;
+          const oldKey = t.dataset.labelOldkey;
+          const newKey = t.value.trim();
+          if (!labelsPath || !oldKey || !newKey || oldKey === newKey) return;
+          const labels = getByPath(cfg, labelsPath) || {};
+          if (labels[newKey] && newKey !== oldKey) {
+            alert("label key 已存在");
+            t.value = oldKey;
+            return;
+          }
+          labels[newKey] = labels[oldKey] || [];
+          delete labels[oldKey];
+          setByPath(cfg, labelsPath, labels);
+          renderConfigForm();
+        }
+      }, true);
+
+      configForm.addEventListener("input", (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLInputElement)) return;
+        if (t.dataset?.labelValues) {
+          const labelsPath = t.dataset.labelValues;
+          const key = t.dataset.labelKeyname;
+          const labels = getByPath(cfg, labelsPath) || {};
+          labels[key] = splitList(t.value);
+          setByPath(cfg, labelsPath, labels);
+        }
+      });
+
+      (async () => {
+        await refreshStatus();
+        await loadTemplates();
+        await loadConfig();
+        setConfigMode("form");
+        renderVarList();
+      })();
+    </script>
+  </body>
+</html>
