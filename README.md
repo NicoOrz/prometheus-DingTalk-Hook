@@ -34,10 +34,18 @@ go build -o prometheus-dingtalk-hook ./cmd/prometheus-dingtalk-hook
 ./prometheus-dingtalk-hook -config ./config.yaml
 ```
 
-### 3) 运行（Docker）
+### 3) 运行（Docker Compose）
+在项目根目录（已包含 `docker-compose.yml`，并按上文创建好 `config.yaml`）中执行：
 ```bash
+docker compose up -d
+```
+
+### 4) 构建镜像（可选）
+Dockerfile 仅用于构建镜像（GoReleaser/本地构建）；运行推荐使用上面的 `docker compose`。
+```bash
+go build -o prometheus-dingtalk-hook ./cmd/prometheus-dingtalk-hook
 docker build -t prometheus-dingtalk-hook:local .
-docker run --rm -p 8080:8080 -v "$PWD/config.yaml:/app/config.yaml:ro" prometheus-dingtalk-hook:local -config /app/config.yaml
+docker run --rm -p 8080:8080 -v "$PWD/config.yaml:/app/config.yaml:ro" -v "$PWD/templates:/app/templates:ro" prometheus-dingtalk-hook:local
 ```
 
 ## Alertmanager 配置示例
