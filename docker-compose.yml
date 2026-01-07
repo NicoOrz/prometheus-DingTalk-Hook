@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   prometheus-dingtalk-hook:
     image: ghcr.io/nicoorz/prometheus-dingtalk-hook:latest
