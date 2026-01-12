@@ -151,6 +151,12 @@ func compileChannels(cfg *config.Config, robots map[string]config.RobotConfig, c
 }
 
 func normalizeMention(m config.MentionConfig) config.MentionConfig {
+	if m.AtAll {
+		m.AtMobiles = nil
+		m.AtUserIds = nil
+		return m
+	}
+
 	userIds := make([]string, 0, len(m.AtUserIds))
 	seenUserIds := make(map[string]struct{}, len(m.AtUserIds))
 	for _, v := range m.AtUserIds {
