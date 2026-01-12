@@ -96,6 +96,19 @@ template:
   dir: "/data/templates"
 ```
 
+## 一键安装（Linux + systemd）
+
+将自动下载最新 Release 的二进制，安装并注册为 systemd 服务：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NicoOrz/promethues-DingTalk-Hook/unstable/install.sh | sh
+```
+
+安装完成后会提示你：
+- 配置文件路径（默认：`/etc/prometheus-dingtalk-hook/config.yml`）
+- 服务名（默认：`prometheus-dingtalk-hook.service`）
+- 常用命令（重启/日志）
+
 ## 管理 UI（可选）
 
 启用示例：
