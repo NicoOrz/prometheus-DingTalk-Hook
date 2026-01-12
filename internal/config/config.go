@@ -63,11 +63,10 @@ type TemplateConfig struct {
 }
 
 type DingTalkConfig struct {
-	Timeout   Duration            `yaml:"timeout"`
-	Robots    []RobotConfig       `yaml:"robots"`
-	Receivers map[string][]string `yaml:"receivers"`
-	Channels  []ChannelConfig     `yaml:"channels"`
-	Routes    []RouteConfig       `yaml:"routes"`
+	Timeout  Duration        `yaml:"timeout"`
+	Robots   []RobotConfig   `yaml:"robots"`
+	Channels []ChannelConfig `yaml:"channels"`
+	Routes   []RouteConfig   `yaml:"routes"`
 }
 
 type RobotConfig struct {
@@ -254,65 +253,44 @@ func validate(cfg *Config) error {
 		robotNames[name] = robot
 	}
 
-	if len(cfg.DingTalk.Channels) > 0 {
-		channelNames := make(map[string]ChannelConfig, len(cfg.DingTalk.Channels))
-		for _, ch := range cfg.DingTalk.Channels {
-			name := strings.TrimSpace(ch.Name)
-			if name == "" {
-				return errors.New("dingtalk.channels[].name must not be empty")
-			}
-			if _, exists := channelNames[name]; exists {
-				return fmt.Errorf("dingtalk.channels has duplicate name %q", name)
-			}
-			if len(ch.Robots) == 0 {
-				return fmt.Errorf("dingtalk.channels[%s].robots must not be empty", name)
-			}
-			for _, r := range ch.Robots {
-				if _, ok := robotNames[r]; !ok {
-					return fmt.Errorf("dingtalk.channels[%s] references unknown robot %q", name, r)
-				}
-			}
-			channelNames[name] = ch
-		}
-		if _, ok := channelNames["default"]; !ok {
-			return errors.New("dingtalk.channels.default is required")
-		}
-
-		for _, route := range cfg.DingTalk.Routes {
-			routeName := strings.TrimSpace(route.Name)
-			if routeName == "" {
-				return errors.New("dingtalk.routes[].name must not be empty")
-			}
-			if len(route.Channels) == 0 {
-				return fmt.Errorf("dingtalk.routes[%s].channels must not be empty", routeName)
-			}
-			for _, ch := range route.Channels {
-				if _, ok := channelNames[ch]; !ok {
-					return fmt.Errorf("dingtalk.routes[%s] references unknown channel %q", routeName, ch)
-				}
-			}
-		}
-
-		return nil
+	if len(cfg.DingTalk.Channels) == 0 {
+		return errors.New("dingtalk.channels must not be empty (must include name \"default\")")
 	}
 
-	if len(cfg.DingTalk.Receivers) == 0 {
-		return errors.New("dingtalk.receivers must not be empty (must include key \"default\")")
+	channelNames := make(map[string]ChannelConfig, len(cfg.DingTalk.Channels))
+	for _, ch := range cfg.DingTalk.Channels {
+		name := strings.TrimSpace(ch.Name)
+		if name == "" {
+			return errors.New("dingtalk.channels[].name must not be empty")
+		}
+		if _, exists := channelNames[name]; exists {
+			return fmt.Errorf("dingtalk.channels has duplicate name %q", name)
+		}
+		if len(ch.Robots) == 0 {
+			return fmt.Errorf("dingtalk.channels[%s].robots must not be empty", name)
+		}
+		for _, r := range ch.Robots {
+			if _, ok := robotNames[r]; !ok {
+				return fmt.Errorf("dingtalk.channels[%s] references unknown robot %q", name, r)
+			}
+		}
+		channelNames[name] = ch
 	}
-	if _, ok := cfg.DingTalk.Receivers["default"]; !ok {
-		return errors.New("dingtalk.receivers.default is required")
+	if _, ok := channelNames["default"]; !ok {
+		return errors.New("dingtalk.channels.default is required")
 	}
 
-	for receiver, names := range cfg.DingTalk.Receivers {
-		if strings.TrimSpace(receiver) == "" {
-			return errors.New("dingtalk.receivers has empty receiver name")
+	for _, route := range cfg.DingTalk.Routes {
+		routeName := strings.TrimSpace(route.Name)
+		if routeName == "" {
+			return errors.New("dingtalk.routes[].name must not be empty")
 		}
-		if len(names) == 0 {
-			return fmt.Errorf("dingtalk.receivers[%s] must not be empty", receiver)
+		if len(route.Channels) == 0 {
+			return fmt.Errorf("dingtalk.routes[%s].channels must not be empty", routeName)
 		}
-		for _, name := range names {
-			if _, ok := robotNames[name]; !ok {
-				return fmt.Errorf("dingtalk.receivers[%s] references unknown robot %q", receiver, name)
+		for _, ch := range route.Channels {
+			if _, ok := channelNames[ch]; !ok {
+				return fmt.Errorf("dingtalk.routes[%s] references unknown channel %q", routeName, ch)
 			}
 		}
 	}

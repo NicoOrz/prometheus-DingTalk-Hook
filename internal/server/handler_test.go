@@ -34,8 +34,11 @@ func TestHandler_TokenAuth(t *testing.T) {
 					Title:   "Alertmanager",
 				},
 			},
-			Receivers: map[string][]string{
-				"default": {"default"},
+			Channels: []config.ChannelConfig{
+				{
+					Name:   "default",
+					Robots: []string{"default"},
+				},
 			},
 		},
 	}

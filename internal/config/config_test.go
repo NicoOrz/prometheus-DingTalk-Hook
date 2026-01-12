@@ -27,8 +27,9 @@ dingtalk:
     - name: "default"
       webhook: "http://example.invalid"
       msg_type: "markdown"
-  receivers:
-    default: ["default"]
+  channels:
+    - name: "default"
+      robots: ["default"]
 `), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
@@ -62,25 +63,6 @@ dingtalk:
   channels:
     - name: "ops"
       robots: ["r1"]
-`), 0o644); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-	if _, err := Load(cfgPath); err == nil {
-		t.Fatalf("expected error")
-	}
-}
-
-func TestLoad_RejectMissingDefaultReceiver(t *testing.T) {
-	dir := t.TempDir()
-	cfgPath := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(cfgPath, []byte(`
-dingtalk:
-  robots:
-    - name: "default"
-      webhook: "http://example.invalid"
-      msg_type: "markdown"
-  receivers:
-    ops-team: ["default"]
 `), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}

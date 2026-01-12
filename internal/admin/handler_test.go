@@ -77,8 +77,11 @@ func TestApplyImport_RollbackDoesNotCorruptMissingConfig(t *testing.T) {
 					Title:   "Alertmanager",
 				},
 			},
-			Receivers: map[string][]string{
-				"default": {"default"},
+			Channels: []config.ChannelConfig{
+				{
+					Name:   "default",
+					Robots: []string{"default"},
+				},
 			},
 		},
 	}

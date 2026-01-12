@@ -181,7 +181,7 @@ func (h *handler) handleStatus(w http.ResponseWriter, r *http.Request, rt *runti
 		reloadStatus = h.reload.Status()
 	}
 	writeJSON(w, http.StatusOK, apiResp{Code: 0, Data: map[string]any{
-		"mode":      rt.Mode,
+		"mode":      "channels",
 		"loaded_at": rt.LoadedAt,
 		"reload":    reloadStatus,
 		"templates": rt.Renderer.TemplateNames(),
@@ -300,12 +300,6 @@ func (h *handler) handleConfigJSON(w http.ResponseWriter, r *http.Request) {
 		cfg.DingTalk.Robots = append([]config.RobotConfig(nil), parsed.DingTalk.Robots...)
 		cfg.DingTalk.Channels = append([]config.ChannelConfig(nil), parsed.DingTalk.Channels...)
 		cfg.DingTalk.Routes = append([]config.RouteConfig(nil), parsed.DingTalk.Routes...)
-		if parsed.DingTalk.Receivers != nil {
-			cfg.DingTalk.Receivers = make(map[string][]string, len(parsed.DingTalk.Receivers))
-			for k, v := range parsed.DingTalk.Receivers {
-				cfg.DingTalk.Receivers[k] = append([]string(nil), v...)
-			}
-		}
 
 		cfg.Auth.Token = ""
 		cfg.Admin.BasicAuth.Password = ""
