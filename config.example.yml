@@ -19,11 +19,14 @@ template:
   # 模板目录：加载目录下的 "*.tmpl"。
   # 留空则使用内置 default 模板。
   #
+  # 一键安装默认路径：
+  #   dir: "/etc/promethues-DingTalk-Hook/templates"
+  #
   # Docker 示例：
   #   dir: "/data/templates"
   #
   # 如果目录不存在（例如未挂载），会自动回退使用内置 default 模板。
-  dir: ""
+  dir: "/etc/promethues-DingTalk-Hook/templates"
 
 admin:
   enabled: false

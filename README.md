@@ -112,6 +112,10 @@ curl -fsSL https://raw.githubusercontent.com/NicoOrz/promethues-DingTalk-Hook/un
 - 服务名（默认：`prometheus-dingtalk-hook.service`）
 - 常用命令（重启/日志）
 
+说明：
+- 默认配置已将 `template.dir` 指向 `/etc/promethues-DingTalk-Hook/templates`
+- 即使该目录为空或没有任何 `*.tmpl`，服务也会自动回退使用内置 default 模板
+
 卸载（默认保留 `/etc/promethues-DingTalk-Hook/` 配置目录）：
 
 ```bash

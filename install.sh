@@ -43,7 +43,7 @@ uninstall() {
     as_root rm -rf "$ETC_DIR"
     echo "已清理配置目录: ${ETC_DIR}"
   else
-    echo "已保留配置目录: ${ETC_DIR}（如需一并删除请加 PURGE=1）"
+    echo "已保留配置目录: ${ETC_DIR}（如需删除请添加 PURGE=1）"
   fi
 
   echo "✅ 卸载完成"
@@ -108,7 +108,7 @@ if [ ! -f "$CFG_DST" ]; then
   as_root cp "${tmp}/config.example.yml" "$CFG_DST"
   echo "已生成配置: ${CFG_DST}"
 else
-  echo "已存在配置: ${CFG_DST}（跳过覆盖）"
+  echo "已存在配置: ${CFG_DST}"
 fi
 
 as_root cp -n "${tmp}/templates/"*.tmpl "$TPL_DST_DIR/" 2>/dev/null || true
@@ -136,9 +136,8 @@ as_root systemctl enable --now "${SERVICE}.service"
 echo ""
 echo "✅ 安装完成"
 echo ""
-echo "配置指引："
+echo "开始使用："
 echo "1) 编辑配置：${CFG_DST}"
 echo "2) 重启服务：systemctl restart ${SERVICE}"
+echo "模板目录：${TPL_DST_DIR}（可放置 *.tmpl；默认配置已指向该目录）"
 echo "3) 查看日志：journalctl -u ${SERVICE} -f"
-echo ""
-echo "模板目录：${TPL_DST_DIR}（可放置 *.tmpl，config 中 template.dir 可按需填写）"

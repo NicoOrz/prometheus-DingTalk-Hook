@@ -45,3 +45,17 @@ func TestRender_DefaultTemplate(t *testing.T) {
 		t.Fatalf("unexpected output: %q", out)
 	}
 }
+
+func TestNewRenderer_DirEmptyFallbackToEmbeddedDefault(t *testing.T) {
+	dir := t.TempDir()
+	r, err := NewRenderer(config.TemplateConfig{Dir: dir})
+	if err != nil {
+		t.Fatalf("NewRenderer: %v", err)
+	}
+	if r.DefaultName() != "default" {
+		t.Fatalf("DefaultName=%q", r.DefaultName())
+	}
+	if !r.HasTemplate("default") {
+		t.Fatalf("missing embedded default template")
+	}
+}
