@@ -53,7 +53,7 @@
             <input type="file" id="fileImport" accept=".zip" />
           </label>
           <span style="flex:1"></span>
-          <button id="btnCfgModeForm" class="active" title="表单模式（推荐）">表单</button>
+          <button id="btnCfgModeForm" class="active" title="表单模式">表单</button>
           <button id="btnCfgModeYaml" title="高级模式：直接编辑 YAML">YAML</button>
         </div>
         <div id="configForm"></div>
@@ -362,7 +362,7 @@
         const adminSaltSet = !!(sens.admin_salt_set ?? sens.AdminSaltSet);
 
         const robotNames = robots.map((r) => String(r?.Name || "")).filter(Boolean);
-        const templateNameOptions = ["", ...templateNames].map((name) => `<option value="${e(name)}">${name ? e(name) : "(默认)"}</option>`).join("");
+        const templateNameOptions = ["", ...templateNames].map((name) => `<option value="${e(name)}">${name ? e(name) : "(未指定)"}</option>`).join("");
 
         const renderNameCheckboxes = (listPath, selected) => {
           return robotNames
@@ -558,7 +558,7 @@
         const adminAuthMode = adminShaSet ? "sha256" : "password";
 
         configForm.innerHTML = `
-          <div class="muted" style="margin-bottom:10px">表单模式会重写 config.yaml（可能丢失注释/顺序）；敏感字段默认不回显，留空表示不修改旧值。</div>
+          <div class="muted" style="margin-bottom:10px">表单模式会重写 config.yaml；注释与字段顺序会丢失。敏感字段不回显；留空表示不修改旧值。</div>
 
           <details open>
             <summary>Server</summary>
@@ -576,7 +576,7 @@
             <summary>Auth</summary>
             <div class="grid" style="margin-top:10px">
               <label>token
-                <input id="auth_token" type="password" value="${e(auth.Token)}" data-bind="Auth.Token" placeholder="${authTokenSet ? "(已设置，留空=不改)" : ""}" />
+                <input id="auth_token" type="password" value="${e(auth.Token)}" data-bind="Auth.Token" placeholder="${authTokenSet ? "已设置；留空不改" : ""}" />
                 <div class="row">
                   <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-toggle-pass="auth_token" />显示</label>
                   <label style="flex-direction:row;align-items:center;gap:6px">
@@ -609,11 +609,11 @@
             <div class="card">
               <div class="row" style="margin-bottom:8px">
                 <div style="font-weight:600">basic_auth</div>
-                <span class="muted">（password 与 password_sha256 互斥）</span>
+                <span class="muted">password 与 password_sha256 互斥</span>
               </div>
               <div class="grid">
                 <label>password
-                  <input id="admin_pwd" type="password" value="${e(basic.Password)}" data-bind="Admin.BasicAuth.Password" placeholder="${adminPwdSet ? "(已设置，留空=不改)" : ""}" />
+                  <input id="admin_pwd" type="password" value="${e(basic.Password)}" data-bind="Admin.BasicAuth.Password" placeholder="${adminPwdSet ? "已设置；留空不改" : ""}" />
                   <div class="row">
                     <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-toggle-pass="admin_pwd" />显示</label>
                     <label style="flex-direction:row;align-items:center;gap:6px">
@@ -623,7 +623,7 @@
                   </div>
                 </label>
                 <label>password_sha256
-                  <input id="admin_sha" type="password" value="${e(basic.PasswordSHA256)}" data-bind="Admin.BasicAuth.PasswordSHA256" placeholder="${adminShaSet ? "(已设置，留空=不改)" : ""}" />
+                  <input id="admin_sha" type="password" value="${e(basic.PasswordSHA256)}" data-bind="Admin.BasicAuth.PasswordSHA256" placeholder="${adminShaSet ? "已设置；留空不改" : ""}" />
                   <div class="row">
                     <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-toggle-pass="admin_sha" />显示</label>
                     <label style="flex-direction:row;align-items:center;gap:6px">
@@ -633,7 +633,7 @@
                   </div>
                 </label>
                 <label>salt (base64)
-                  <input id="admin_salt" type="password" value="${e(basic.Salt)}" data-bind="Admin.BasicAuth.Salt" placeholder="${adminSaltSet ? "(已设置，留空=不改)" : ""}" />
+                  <input id="admin_salt" type="password" value="${e(basic.Salt)}" data-bind="Admin.BasicAuth.Salt" placeholder="${adminSaltSet ? "已设置；留空不改" : ""}" />
                   <div class="row">
                     <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-toggle-pass="admin_salt" />显示</label>
                     <label style="flex-direction:row;align-items:center;gap:6px">
@@ -643,7 +643,7 @@
                   </div>
                 </label>
               </div>
-              <div class="muted">提示：切换认证方式时，建议先勾选“清空”另一种方式再填写新值。</div>
+              <div class="muted">切换认证方式时，先勾选“清空”另一种方式，再填写新值。</div>
             </div>
           </details>
 
@@ -670,7 +670,7 @@
                 <span style="flex:1"></span>
                 <button data-action="addRobot">+ robot</button>
               </div>
-              ${robotsHTML || `<div class="muted">无 robots（但后端校验要求至少 1 个）</div>`}
+              ${robotsHTML || `<div class="muted">无 robots；后端校验要求至少 1 个</div>`}
             </div>
 
             <div class="card">
@@ -679,7 +679,7 @@
                 <span style="flex:1"></span>
                 <button data-action="addChannel">+ channel</button>
               </div>
-              ${channelsHTML || `<div class="muted">无 channels（channels 模式要求包含 default）</div>`}
+              ${channelsHTML || `<div class="muted">无 channels；要求包含 default</div>`}
             </div>
 
             <div class="card">
@@ -688,7 +688,7 @@
                 <span style="flex:1"></span>
                 <button data-action="addRoute">+ route</button>
               </div>
-              ${routesHTML || `<div class="muted">无 routes（允许为空）</div>`}
+              ${routesHTML || `<div class="muted">无 routes；允许为空</div>`}
             </div>
           </details>
         `;
@@ -995,7 +995,7 @@
         if (act === "addLabel") {
           const labelsPath = btn.dataset.path;
           const labels = getByPath(cfg, labelsPath) || {};
-          const key = prompt("label key（如 severity）");
+          const key = prompt("label key：severity");
           if (!key) return;
           if (labels[key]) {
             alert("label 已存在");
