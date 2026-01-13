@@ -170,12 +170,12 @@ func applyDefaults(cfg *Config) {
 		cfg.DingTalk.Timeout = Duration(5 * time.Second)
 	}
 
-		for i := range cfg.DingTalk.Robots {
-			if cfg.DingTalk.Robots[i].MsgType == "" {
-				cfg.DingTalk.Robots[i].MsgType = "markdown"
-			}
+	for i := range cfg.DingTalk.Robots {
+		if cfg.DingTalk.Robots[i].MsgType == "" {
+			cfg.DingTalk.Robots[i].MsgType = "markdown"
 		}
 	}
+}
 
 func validate(cfg *Config) error {
 	if !strings.HasPrefix(cfg.Server.Path, "/") {
