@@ -8,7 +8,7 @@
 
 ## 功能
 
-- Alertmanager Webhook 接收（默认：`POST /alert`）
+- Alertmanager Webhook 接收：`POST /alert`
 - 多钉钉机器人配置
 - 路由：`channels + routes`（按 receiver/status/labels 匹配）
 - @：`@all` / `@手机号` / `@userId`（消息末尾自动追加 `@...`）
@@ -46,17 +46,23 @@ template:
   dir: "templates"
 ```
 
-说明：
+规则：
 
-- `template.dir` 留空：使用内置 default 模板
-- `template.dir` 目录不存在（例如 Docker 未挂载）：自动回退使用内置 default 模板
-- `channels[].template` 选择模板名，例如 `default` 对应 `default.tmpl`
+- `template.dir` 为空：使用内置 `default` 模板
+- `template.dir` 指向的目录不存在：回退使用内置 `default` 模板
+- `channels[].template` 填写模板名，`default` 对应 `default.tmpl`
 
 ## Markdown 标题
 
 当机器人 `msg_type: "markdown"` 时，`dingtalk.robots[].title` 对应钉钉 `markdown.title`。
 
-- `title` 留空：默认使用 Alertmanager 的 `summary`（优先 `commonAnnotations.summary`，否则取第一条 alert 的 `annotations.summary`，再回退 `alertname`，最后为 `"Alertmanager"`）
+`title` 为空时，`markdown.title` 取值顺序如下：
+
+- `commonAnnotations.summary`
+- `alerts[0].annotations.summary`
+- `commonLabels.alertname`
+- `alerts[0].labels.alertname`
+- `"Alertmanager"`
 
 ## Alertmanager 配置示例
 
@@ -107,22 +113,23 @@ template:
 curl -fsSL https://raw.githubusercontent.com/NicoOrz/promethues-DingTalk-Hook/unstable/install.sh | sh
 ```
 
-安装完成后会提示你：
-- 配置文件路径（默认：`/etc/promethues-DingTalk-Hook/config.yml`）
-- 服务名（默认：`prometheus-dingtalk-hook.service`）
+安装完成后输出：
+- 配置文件路径：`/etc/promethues-DingTalk-Hook/config.yml`
+- 服务名：`prometheus-dingtalk-hook.service`
 - 常用命令（重启/日志）
 
-说明：
-- 默认配置已将 `template.dir` 指向 `/etc/promethues-DingTalk-Hook/templates`
-- 即使该目录为空或没有任何 `*.tmpl`，服务也会自动回退使用内置 default 模板
+规则：
 
-卸载（默认保留 `/etc/promethues-DingTalk-Hook/` 配置目录）：
+- 安装生成的配置将 `template.dir` 指向 `/etc/promethues-DingTalk-Hook/templates`
+- 目录为空或目录中无 `*.tmpl` 时，服务使用内置 `default` 模板
+
+卸载，保留 `/etc/promethues-DingTalk-Hook/`：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/NicoOrz/promethues-DingTalk-Hook/unstable/install.sh | sh -s uninstall
 ```
 
-彻底卸载（包含配置目录）：
+彻底卸载，删除 `/etc/promethues-DingTalk-Hook/`：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/NicoOrz/promethues-DingTalk-Hook/unstable/install.sh | PURGE=1 sh -s uninstall
@@ -144,4 +151,4 @@ admin:
 ## 安全提示
 
 - 不要在公开仓库中泄露 `access_token`、`secret`、`auth.token`
-- 建议置于内网或启用 token 鉴权
+- 部署到内网或启用 token 鉴权

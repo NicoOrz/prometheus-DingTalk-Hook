@@ -19,13 +19,13 @@ template:
   # 模板目录：加载目录下的 "*.tmpl"。
   # 留空则使用内置 default 模板。
   #
-  # 一键安装默认路径：
+  # 一键安装写入路径：
   #   dir: "/etc/promethues-DingTalk-Hook/templates"
   #
   # Docker 示例：
   #   dir: "/data/templates"
   #
-  # 如果目录不存在（例如未挂载），会自动回退使用内置 default 模板。
+  # 目录不存在时，回退使用内置 default 模板。
   dir: "/etc/promethues-DingTalk-Hook/templates"
 
 admin:
@@ -45,12 +45,12 @@ dingtalk:
   robots:
     - name: "default"
       webhook: "https://oapi.dingtalk.com/robot/send?access_token=YOUR_ACCESS_TOKEN"
-      # 如果机器人启用了“加签”，填写 secret（可选）。
+      # 如果机器人启用了“加签”，填写 secret。
       secret: ""
       # markdown / text
       msg_type: "markdown"
       # 钉钉 markdown.title
-      # - 留空：默认使用 Alertmanager 的 summary。
+      # - 留空：使用 Alertmanager 的 summary。
       title: ""
 
   # channels + routes：
