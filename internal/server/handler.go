@@ -136,7 +136,7 @@ func withRequestLog(next http.Handler, logger *slog.Logger) http.Handler {
 		start := time.Now()
 		sr := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sr, r)
-		logger.Info("http request", "method", r.Method, "path", r.URL.Path, "status", sr.status, "latency", time.Since(start))
+logger.Info("http request", "method", r.Method, "path", r.URL.Path, "status", sr.status, "bytes", sr.bytes, "latency", time.Since(start))
 	})
 }
 
