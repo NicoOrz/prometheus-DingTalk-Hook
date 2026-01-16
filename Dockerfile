@@ -14,7 +14,7 @@ COPY . .
 RUN set -eux; \
 	GOARM=""; \
 	if [ "$TARGETARCH" = "arm" ] && [ -n "${TARGETVARIANT:-}" ]; then GOARM="${TARGETVARIANT#v}"; fi; \
-	CGO_ENABLED=0 GOOS="${TARGETOS:-linux}" GOARCH="${TARGETARCH:-amd64}" GOARM="$GOARM" \
+	CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" GOARM="$GOARM" \
 		go build -trimpath -ldflags "-s -w" -o /out/prometheus-dingtalk-hook ./cmd/prometheus-dingtalk-hook
 
 FROM gcr.io/distroless/static-debian12:nonroot
