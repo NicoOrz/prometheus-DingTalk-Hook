@@ -12,8 +12,12 @@ func TestSecret_JSON_RedactsWhenSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Marshal: %v", err)
 	}
-	if string(b) != `"<secret>"` {
-		t.Fatalf("json=%s", b)
+	var got string
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if got != RedactedSecret {
+		t.Fatalf("got=%q", got)
 	}
 }
 
@@ -22,8 +26,12 @@ func TestSecret_JSON_EmptyWhenBlank(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Marshal: %v", err)
 	}
-	if string(b) != `""` {
-		t.Fatalf("json=%s", b)
+	var got string
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("got=%q", got)
 	}
 }
 
@@ -54,7 +62,11 @@ func TestSecretURL_JSON_RedactsWhenSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Marshal: %v", err)
 	}
-	if string(b) != `"<secret>"` {
-		t.Fatalf("json=%s", b)
+	var got string
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if got != RedactedSecret {
+		t.Fatalf("got=%q", got)
 	}
 }

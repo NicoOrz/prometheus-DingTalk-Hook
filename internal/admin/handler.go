@@ -171,12 +171,12 @@ type robotClearSensitive struct {
 }
 
 type adminConfigJSON struct {
-	Server   config.ServerConfig     `json:"-"`
-	Auth     adminAuthConfigJSON     `json:"-"`
-	Admin    adminAdminConfigJSON    `json:"-"`
-	Reload   config.ReloadConfig     `json:"-"`
-	Template adminTemplateConfigJSON `json:"-"`
-	DingTalk adminDingTalkConfigJSON `json:"-"`
+	Server   config.ServerConfig
+	Auth     adminAuthConfigJSON
+	Admin    adminAdminConfigJSON
+	Reload   config.ReloadConfig
+	Template adminTemplateConfigJSON
+	DingTalk adminDingTalkConfigJSON
 }
 
 type adminAuthConfigJSON struct {

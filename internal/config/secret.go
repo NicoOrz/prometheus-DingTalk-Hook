@@ -17,9 +17,9 @@ type Secret string
 
 func (s Secret) MarshalJSON() ([]byte, error) {
 	if isBlankString(string(s)) {
-		return json.Marshal("")
+		return []byte(`""`), nil
 	}
-	return json.Marshal(RedactedSecret)
+	return []byte(`"` + RedactedSecret + `"`), nil
 }
 
 func (s *Secret) UnmarshalJSON(data []byte) error {
@@ -68,9 +68,9 @@ type SecretURL string
 
 func (s SecretURL) MarshalJSON() ([]byte, error) {
 	if isBlankString(string(s)) {
-		return json.Marshal("")
+		return []byte(`""`), nil
 	}
-	return json.Marshal(RedactedSecret)
+	return []byte(`"` + RedactedSecret + `"`), nil
 }
 
 func (s *SecretURL) UnmarshalJSON(data []byte) error {
