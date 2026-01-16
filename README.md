@@ -6,6 +6,10 @@
 - 使用 Go `text/template` 渲染消息
 - 转发到钉钉群机器人
 
+## K8s manifests
+
+仓库内置 Kustomize manifests 与配置指南：`k8s/README.md`。
+
 ## 功能
 
 - 多钉钉机器人配置

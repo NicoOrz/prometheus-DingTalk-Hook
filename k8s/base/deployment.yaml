@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-dingtalk-hook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-dingtalk-hook
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prometheus-dingtalk-hook
+    spec:
+      containers:
+        - name: prometheus-dingtalk-hook
+          image: ghcr.io/nicoorz/prometheus-dingtalk-hook:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - -config
+            - /etc/prometheus-dingtalk-hook/config.yaml
+          ports:
+            - name: http
+              containerPort: 9098
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus-dingtalk-hook
+              readOnly: true
+            - name: templates
+              mountPath: /etc/prometheus-dingtalk-hook/templates
+              readOnly: true
+      volumes:
+        - name: config
+          secret:
+            secretName: prometheus-dingtalk-hook-config
+        - name: templates
+          configMap:
+            name: prometheus-dingtalk-hook-templates
+            optional: true
