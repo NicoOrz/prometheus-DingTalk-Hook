@@ -969,7 +969,17 @@ func applyImport(ctx context.Context, logger *slog.Logger, reloadMgr *reload.Man
 	}
 
 	baseDir := filepath.Dir(configPath)
+
 	newTemplatesDir := strings.TrimSpace(cfg.Template.Dir)
+	if newTemplatesDir == "" {
+		return errors.New("template.dir is empty")
+	}
+	if !filepath.IsAbs(newTemplatesDir) {
+		newTemplatesDir = filepath.Join(baseDir, newTemplatesDir)
+	}
+	if err := ensureUnderBase(baseDir, newTemplatesDir); err != nil {
+		return err
+	}
 
 	oldCfgBytes, err := os.ReadFile(configPath)
 	oldCfgExists := err == nil
