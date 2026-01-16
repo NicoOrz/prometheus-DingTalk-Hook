@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -68,5 +69,49 @@ dingtalk:
 	}
 	if _, err := Load(cfgPath); err == nil {
 		t.Fatalf("expected error")
+	}
+}
+
+func TestLoad_RejectRobotWebhookInvalidScheme(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(cfgPath, []byte(`
+dingtalk:
+  robots:
+    - name: "r1"
+      webhook: "ftp://example.invalid"
+      msg_type: "markdown"
+  channels:
+    - name: "default"
+      robots: ["r1"]
+`), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if _, err := Load(cfgPath); err == nil {
+		t.Fatalf("expected error")
+	} else if !strings.Contains(err.Error(), "scheme must be http or https") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoad_RejectRobotWebhookMissingHost(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(cfgPath, []byte(`
+dingtalk:
+  robots:
+    - name: "r1"
+      webhook: "https:///robot/send?access_token=xxx"
+      msg_type: "markdown"
+  channels:
+    - name: "default"
+      robots: ["r1"]
+`), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if _, err := Load(cfgPath); err == nil {
+		t.Fatalf("expected error")
+	} else if !strings.Contains(err.Error(), "host must not be empty") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
