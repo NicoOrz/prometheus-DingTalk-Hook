@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-dingtalk-hook-templates
+data:
+  default.tmpl: |
+    {{- $p := .Payload -}}
+    {{- $status := $p.Status | default "unknown" -}}
+    {{ if eq $status "firing" }}
+    ### 🔥 告警触发（{{ .FiringCount }}）
+    {{ else if eq $status "resolved" }}
+    ### ✅ 告警恢复（{{ .ResolvedCount }}）
+    {{ else }}
+    ### ℹ️ 告警通知（{{ len $p.Alerts }}）
+    {{ end }}
+
+    {{- $n := len $p.Alerts -}}
+    {{- if eq $n 0 }}
+    {{- $severity := default (default "unknown" (index $p.CommonLabels "level")) (index $p.CommonLabels "severity") -}}
+    {{- $description := default "-" (index $p.CommonAnnotations "description") -}}
+    {{- $summary := default "-" (index $p.CommonAnnotations "summary") -}}
+    - **严重度**: `{{ $severity }}`
+    - **描述**: {{ $description }}
+    - **摘要**: {{ $summary }}
+    {{- else }}
+    {{- $a0 := index $p.Alerts 0 -}}
+    {{- $severity := default (default (default (default "unknown" (index $p.CommonLabels "level")) (index $a0.Labels "level")) (index $p.CommonLabels "severity")) (index $a0.Labels "severity") -}}
+    {{- $description := default (default "-" (index $p.CommonAnnotations "description")) (index $a0.Annotations "description") -}}
+    {{- $summary := default (default "-" (index $p.CommonAnnotations "summary")) (index $a0.Annotations "summary") -}}
+    - **严重度**: `{{ $severity }}`
+    - **描述**: {{ $description }}
+    - **摘要**: {{ $summary }}
+    {{- end }}
+
+    {{- if gt $n 1 }}
+    {{- range $i, $a := $p.Alerts }}
+    {{- if gt $i 0 }}
+
+    ---
+
+    {{- end }}
+    {{- $severity := default (default (default (default "unknown" (index $p.CommonLabels "level")) (index $a.Labels "level")) (index $p.CommonLabels "severity")) (index $a.Labels "severity") -}}
+    {{- $description := default (default "-" (index $p.CommonAnnotations "description")) (index $a.Annotations "description") -}}
+    {{- $summary := default (default "-" (index $p.CommonAnnotations "summary")) (index $a.Annotations "summary") -}}
+    - **严重度**: `{{ $severity }}`
+    - **描述**: {{ $description }}
+    - **摘要**: {{ $summary }}
+    {{- end }}
+    {{- end }}

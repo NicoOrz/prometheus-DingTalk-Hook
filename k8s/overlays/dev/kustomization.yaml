@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+namespace: prometheus-dingtalk
+
+images:
+  - name: ghcr.io/nicoorz/prometheus-dingtalk-hook
+    newTag: latest
+
+patches:
+  - target:
+      kind: Deployment
+      name: prometheus-dingtalk-hook
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: prometheus-dingtalk-hook
+      spec:
+        template:
+          spec:
+            containers:
+              - name: prometheus-dingtalk-hook
+                env:
+                  - name: TZ
+                    value: "Asia/Shanghai"
