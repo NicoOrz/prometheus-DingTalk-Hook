@@ -148,6 +148,9 @@ func withPanicRecover(next http.Handler, logger *slog.Logger) http.Handler {
 		defer func() {
 			if rec := recover(); rec != nil {
 				logger.Error("panic recovered", "panic", rec, "method", r.Method, "path", r.URL.Path, "stack", string(runtimedebug.Stack()))
+				if sr, ok := w.(*statusRecorder); ok && sr.wroteHeader {
+					return
+				}
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			}
 		}()
