@@ -8,4 +8,4 @@ RUN mkdir -p /app/templates
 EXPOSE 9098
 
 ENTRYPOINT ["/app/prometheus-dingtalk-hook"]
-CMD ["--config.file", "/app/config.yaml"]
+CMD ["--config.file", "/app/config.yml"]
