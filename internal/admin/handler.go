@@ -970,6 +970,15 @@ func applyImport(ctx context.Context, logger *slog.Logger, reloadMgr *reload.Man
 
 	baseDir := filepath.Dir(configPath)
 	newTemplatesDir := strings.TrimSpace(cfg.Template.Dir)
+	if newTemplatesDir == "" {
+		return errors.New("template.dir is not configured")
+	}
+	if err := ensureUnderBase(baseDir, newTemplatesDir); err != nil {
+		return err
+	}
+	if err := ensureUnderBase(baseDir, filepath.Dir(newTemplatesDir)); err != nil {
+		return fmt.Errorf("template.dir %q must be a subdirectory under %q", newTemplatesDir, baseDir)
+	}
 
 	oldCfgBytes, err := os.ReadFile(configPath)
 	oldCfgExists := err == nil
